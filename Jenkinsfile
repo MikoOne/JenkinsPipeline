@@ -18,7 +18,7 @@ pipeline {
         stage('analyse') {
           steps {
             echo 'analyse'
-            sh deploy.sh
+            sh 'sh deploy.sh'
           }
         }
 
