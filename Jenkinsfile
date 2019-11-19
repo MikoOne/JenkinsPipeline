@@ -12,7 +12,7 @@ pipeline {
           steps {
             echo 'build'
             sh 'sh build.sh'
-            sh 'sh printenv | sort'
+            sh 'sh "printenv | sort"'
           }
         }
 
