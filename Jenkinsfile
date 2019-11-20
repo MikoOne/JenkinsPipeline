@@ -25,26 +25,15 @@ pipeline {
       }
     }
 
-    stage('deyloy') {
-      parallel {
-        stage('deyloy') {
-          steps {
-            echo 'deploy'
-          }
-        }
+    stage('Test') {
+      steps {
+        echo 'Test'
+      }
+    }
 
-        stage('upload_product') {
-          steps {
-            echo 'upload'
-          }
-        }
-
-        stage('test') {
-          steps {
-            echo 'test'
-          }
-        }
-
+    stage('deploy') {
+      steps {
+        echo 'deploy'
       }
     }
 
