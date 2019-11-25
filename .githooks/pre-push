@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# An example hook script to verify what is about to be pushed.  Called by "git
+# push" after it has checked the remote status, but before anything has been
+# pushed.  If this script exits with a non-zero status nothing will be pushed.
+#
+# This hook is called with the following parameters:
+#
+# $1 -- Name of the remote to which the push is being done
+# $2 -- URL to which the push is being done
+#
+# If pushing without using a named remote those arguments will be equal.
+#
+# Information about the commits which are being pushed is supplied as lines to
+# the standard input in the form:
+#
+#   <local ref> <local sha1> <remote ref> <remote sha1>
+#
+# This sample shows how to prevent push of commits where the log message starts
+# with "WIP" (work in progress).
+
+function get_json_value()
+{
+  local json=$1
+  local key=$2
+  if [[ -z "$3" ]]; then
+    local num=1
+  else
+    local num=$3
+  fi
+  local value=$(echo "${json}" | awk -F"[,:}]" '{for(i=1;i<=NF;i++){if($i~/'${key}'\042/){print $(i+1)}}}' | tr -d '"' | sed -n ${num}p)
+  echo ${value}
+}
+
+bot_send_message()
+{
+	# get token
+	token_result=`curl -X POST https://open.feishu.cn/open-apis/auth/v3/app_access_token/internal/ \-H 'Content-Type: application/json' \-d '{"app_id":"cli_9c108f8db1fc9108","app_secret":"70mBEoHAcpC1HIqNhU3aTbyFMS6BkT8W"}'`
+    token=`get_json_value $token_result app_access_token`
+	card_json="{\"config\":{\"wide_screen_mode\":true},\"header\":{\"title\":{\"tag\":\"plain_text\",\"content\":\"Grey分支信息\"}},\"elements\":[{\"tag\":\"div\",\"text\":{\"tag\":\"plain_text\",\"content\":\"{$1}\"}}]}"
+	params_json="{\"chat_id\":\"6763166074566361352\",\"msg_type\":\"interactive\",\"update_multi\":false,\"card\":$card_json}"
+	curl -X POST \
+  	https://open.feishu.cn/open-apis/message/v4/send/ \
+  	-H "Authorization: Bearer $token" \
+  	-H 'Content-Type: application/json' \
+  	-d "$params_json"
+}
+
+remote="$1"
+url="$2"
+
+z40=0000000000000000000000000000000000000000
+
+while read local_ref local_sha remote_ref remote_sha
+do
+	if [ "$local_sha" = $z40 ]
+	then
+		# Handle delete
+		:
+	else
+		if [ "$remote_sha" = $z40 ]
+		then
+			# New branch, examine all commits
+			range="$local_sha"
+			if [[ $local_ref =~ ^refs/heads/grey/ ]]; then
+				branchs=`git branch -r --contains $local_sha`
+				git_log=`git reflog | awk 'NR==1{ print $6 " -> " $8; exit }'`
+				bot_send_message "$git_log"
+			fi
+		else
+			# Update to existing branch, examine new commits
+			range="$remote_sha..$local_sha"
+		fi
+
+		# Check for WIP commit
+		commit=`git rev-list -n 1 --grep '^WIP' "$range"`
+		if [ -n "$commit" ]
+		then
+			echo >&2 "Found WIP commit in $local_ref, not pushing"
+			exit 1
+		fi
+	fi
+done
+
